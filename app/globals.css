@@ -1,0 +1,96 @@
+@import "tailwindcss";
+
+/* ---- Esports County brand theme — gold / charcoal / silver ---- */
+:root {
+  --bg: #0a0c10;
+  --bg-elev: #111419;
+  --bg-card: #14181f;
+  --bg-hover: #1c2129;
+  --border: #2a2f39;
+  --text: #eaedf3;
+  --text-muted: #99a2b1;
+  --text-dim: #646d7e;
+  --brand: #d6a43e; /* EC gold */
+  --brand-2: #f3d489; /* champagne highlight */
+  --gold-deep: #a2761d;
+  --accent: #d6a43e;
+  --success: #35b06a;
+  --warning: #e0a63a;
+  --danger: #e35b52;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-bg-elev: var(--bg-elev);
+  --color-bg-card: var(--bg-card);
+  --color-bg-hover: var(--bg-hover);
+  --color-border: var(--border);
+  --color-text: var(--text);
+  --color-text-muted: var(--text-muted);
+  --color-text-dim: var(--text-dim);
+  --color-brand: var(--brand);
+  --color-brand-2: var(--brand-2);
+  --color-accent: var(--accent);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --font-sans: var(--font-geist-sans), system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), monospace;
+}
+
+* {
+  border-color: var(--border);
+}
+
+body {
+  background-color: var(--bg);
+  background-image: url("/hex-pattern.svg");
+  color: var(--text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* The EC octagon emblem (matches the logo). */
+.ec-badge {
+  background: linear-gradient(145deg, #f6dc8e 0%, #d6a43e 46%, #a2761d 100%);
+  clip-path: polygon(30% 0%, 70% 0%, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 0% 30%);
+  color: #1a1305;
+  box-shadow: 0 2px 10px rgba(214, 164, 62, 0.35);
+}
+
+/* Gold glow used on the login / marketing surfaces */
+.brand-glow {
+  background:
+    radial-gradient(60rem 40rem at 15% -10%, rgba(214, 164, 62, 0.16), transparent 60%),
+    radial-gradient(50rem 40rem at 110% 10%, rgba(243, 212, 137, 0.1), transparent 55%);
+}
+
+.brand-gradient-text {
+  background: linear-gradient(100deg, #f6dc8e, var(--brand) 60%, var(--gold-deep));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Silver metallic wordmark (like the logo lettering) */
+.silver-text {
+  background: linear-gradient(180deg, #ffffff, #c3cad6 55%, #8b93a3);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 6px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--gold-deep);
+}

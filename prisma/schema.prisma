@@ -1,0 +1,435 @@
+// Esports County — Company Work Portal
+// Data model mirrors the company workflow (approval gate, departments,
+// events, meetings, weekly goals, manpower/finance, attendance).
+//
+// Dev database: SQLite (file). Production: switch `provider` to "postgresql"
+// and point DATABASE_URL at Supabase — the models below are portable.
+//
+// NOTE: SQLite doesn't support Prisma enums, so status-like fields are
+// Strings with allowed values documented in lib/constants.ts.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Department {
+  id        String    @id @default(cuid())
+  name      String    @unique
+  slug      String    @unique
+  color     String    @default("#6366f1")
+  headId    String?   @unique
+  head      Profile?  @relation("DeptHead", fields: [headId], references: [id])
+  members   Profile[] @relation("DeptMembers")
+  projects  Project[]
+  tasks     Task[]
+  manpowerRequests ManpowerRequest[]
+  createdAt DateTime  @default(now())
+}
+
+model Profile {
+  id             String   @id @default(cuid())
+  email          String   @unique
+  fullName       String
+  passwordHash   String
+  jobRole        String // e.g. "Founder / CEO", "Creative Head"
+  accessLevel    String   @default("member") // admin | manager | member
+  fullAccess     Boolean  @default(false) // COO-style: sees everything company-wide
+  employmentType String   @default("full_time") // full_time | part_time | freelancer
+  phone          String?
+  avatarColor    String   @default("#6366f1")
+  status         String   @default("active") // active | invited | inactive
+  createdAt      DateTime @default(now())
+
+  departmentId String?
+  department   Department? @relation("DeptMembers", fields: [departmentId], references: [id])
+  headsDept    Department? @relation("DeptHead")
+
+  reportsToId String?
+  reportsTo   Profile?  @relation("Reports", fields: [reportsToId], references: [id])
+  reports     Profile[] @relation("Reports")
+
+  sessions        Session[]
+  tasksAssigned   Task[]            @relation("TaskAssignee")
+  tasksCreated    Task[]            @relation("TaskCreator")
+  comments        TaskComment[]
+  eventComments   EventComment[]
+  approvals       EventApproval[]
+  crew            EventCrew[]
+  weeklyGoals     WeeklyGoal[]
+  attendances     Attendance[]
+  notifications   Notification[]
+  escalations     Escalation[]
+  manpowerReqs    ManpowerRequest[] @relation("ManpowerRequester")
+  manpowerDecided ManpowerRequest[] @relation("ManpowerDecider")
+  kpis            Kpi[]             @relation("KpiAssignee")
+  activity        ActivityLog[]
+  paymentsReviewed PaymentRequest[]     @relation("PaymentReviewer")
+  paymentStatusChanges PaymentStatusEvent[] @relation("PaymentStatusActor")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  profileId String
+  profile   Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model Event {
+  id             String   @id @default(cuid())
+  name           String
+  gameTitle      String?
+  type           String   @default("tournament") // tournament | watchparty | show
+  lifecycleStage String   @default("pitched") // pitched | discussion | planning | approved | live | post_review | closed
+  description    String?
+  startDate      DateTime?
+  endDate        DateTime?
+  broadcastLinks String?
+  createdById    String?
+  createdAt      DateTime @default(now())
+
+  approvals EventApproval[]
+  crew      EventCrew[]
+  projects  Project[]
+  tasks     Task[]
+  meetings  Meeting[]
+  runOfShow RunOfShowItem[]
+  budgets   Budget[]
+  kpis      Kpi[]
+  comments  EventComment[]
+  attachments Attachment[]
+}
+
+// Team discussion thread attached to an event.
+model EventComment {
+  id        String   @id @default(cuid())
+  eventId   String
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    Profile  @relation(fields: [authorId], references: [id])
+  body      String
+  createdAt DateTime @default(now())
+}
+
+// Key performance indicator / target for an event, optionally owned by a person.
+model Kpi {
+  id         String   @id @default(cuid())
+  eventId    String
+  event      Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  title      String
+  target     String?
+  assigneeId String?
+  assignee   Profile? @relation("KpiAssignee", fields: [assigneeId], references: [id])
+  status     String   @default("open") // open | done
+  createdAt  DateTime @default(now())
+}
+
+// The 6-position approval gate: one row per required approver.
+model EventApproval {
+  id         String   @id @default(cuid())
+  eventId    String
+  event      Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  approverId String
+  approver   Profile  @relation(fields: [approverId], references: [id], onDelete: Cascade)
+  decision   String   @default("pending") // pending | agree | needs_discussion
+  note       String?
+  decidedAt  DateTime?
+
+  @@unique([eventId, approverId])
+}
+
+model EventCrew {
+  id        String  @id @default(cuid())
+  eventId   String
+  event     Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  profileId String
+  profile   Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  crewRole  String // producer | caster | observer | graphics | editor | admin ...
+
+  @@unique([eventId, profileId, crewRole])
+}
+
+model Project {
+  id           String     @id @default(cuid())
+  name         String
+  description  String?
+  status       String     @default("active") // active | on_hold | done
+  eventId      String?
+  event        Event?     @relation(fields: [eventId], references: [id])
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id])
+  startDate    DateTime?
+  endDate      DateTime?
+  createdAt    DateTime   @default(now())
+  tasks        Task[]
+}
+
+model Task {
+  id           String     @id @default(cuid())
+  title        String
+  description  String?
+  status       String     @default("todo") // todo | in_progress | review | done
+  priority     String     @default("medium") // low | medium | high | urgent
+  dueDate      DateTime?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  completedAt  DateTime?
+
+  eventId      String?
+  event        Event?      @relation(fields: [eventId], references: [id])
+  projectId    String?
+  project      Project?    @relation(fields: [projectId], references: [id])
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id])
+
+  assigneeId String?
+  assignee   Profile? @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  createdById String?
+  createdBy   Profile? @relation("TaskCreator", fields: [createdById], references: [id])
+
+  comments    TaskComment[]
+  attachments Attachment[]
+}
+
+// A link to an external file/asset (Google Sheet, Slides, Drive, Figma, image, …)
+// attached to a task or an event. Kept as links, organised in a grid.
+model Attachment {
+  id        String   @id @default(cuid())
+  taskId    String?
+  task      Task?    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  eventId   String?
+  event     Event?   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  title     String
+  url       String
+  kind      String   @default("link") // sheet | slides | doc | drive | figma | image | link
+  addedById String?
+  createdAt DateTime @default(now())
+}
+
+model TaskComment {
+  id        String   @id @default(cuid())
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    Profile  @relation(fields: [authorId], references: [id])
+  body      String
+  createdAt DateTime @default(now())
+}
+
+model WeeklyGoal {
+  id        String   @id @default(cuid())
+  profileId String
+  profile   Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  weekStart DateTime
+  title     String
+  status    String   @default("open") // open | done
+  notes     String?
+  createdAt DateTime @default(now())
+}
+
+model Meeting {
+  id        String        @id @default(cuid())
+  type      String // discussion | planning | weekly | post_review
+  title     String
+  eventId   String?
+  event     Event?        @relation(fields: [eventId], references: [id])
+  date      DateTime
+  agenda    String?
+  createdAt DateTime      @default(now())
+  prep      MeetingPrep[]
+}
+
+model MeetingPrep {
+  id           String   @id @default(cuid())
+  meetingId    String
+  meeting      Meeting  @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  departmentId String?
+  ideas        String?
+  plans        String?
+  requirements String?
+  deliverables String?
+  createdAt    DateTime @default(now())
+}
+
+model RunOfShowItem {
+  id           String   @id @default(cuid())
+  eventId      String
+  event        Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  order        Int
+  title        String
+  ownerRole    String?
+  plannedStart String?
+  duration     String?
+  notes        String?
+}
+
+model ManpowerRequest {
+  id           String   @id @default(cuid())
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id])
+  requestedById String
+  requestedBy  Profile  @relation("ManpowerRequester", fields: [requestedById], references: [id])
+  roleNeeded   String
+  count        Int      @default(1)
+  reason       String?
+  budgetNote   String?
+  status       String   @default("pending") // pending | approved | rejected
+  decidedById  String?
+  decidedBy    Profile? @relation("ManpowerDecider", fields: [decidedById], references: [id])
+  createdAt    DateTime @default(now())
+}
+
+model Budget {
+  id       String @id @default(cuid())
+  eventId  String
+  event    Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  category String // staffing | prize_pool | production | marketing
+  planned  Float  @default(0)
+  actual   Float  @default(0)
+  note     String?
+}
+
+model Attendance {
+  id        String    @id @default(cuid())
+  profileId String
+  profile   Profile   @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  clockIn   DateTime  @default(now())
+  clockOut  DateTime?
+  note      String?
+  report    String? // what the person did this session (filled at clock-out)
+  links     String? // optional links (drive/figma/stream), newline or space separated
+}
+
+model Notification {
+  id          String   @id @default(cuid())
+  recipientId String
+  recipient   Profile  @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+  type        String
+  message     String
+  link        String?
+  readAt      DateTime?
+  createdAt   DateTime @default(now())
+}
+
+model Escalation {
+  id        String   @id @default(cuid())
+  raisedById String
+  raisedBy  Profile  @relation(fields: [raisedById], references: [id])
+  type      String // emergency | non_emergency
+  message   String
+  status    String   @default("open") // open | resolved
+  createdAt DateTime @default(now())
+}
+
+model ActivityLog {
+  id        String   @id @default(cuid())
+  actorId   String?
+  actor     Profile? @relation(fields: [actorId], references: [id])
+  action    String
+  detail    String?
+  createdAt DateTime @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// Payment portal — public payees submit a request; Finance reviews and pays
+// through the company bank. No money moves through this application.
+// ---------------------------------------------------------------------------
+
+model PaymentRequest {
+  id           String @id @default(cuid())
+  trackingCode String @unique // shown to the payee, e.g. EC-PAY-7GK2Q
+
+  // What kind of payment
+  category  String // vendor | prize_pool | influencer | salary | freelancer | event | reimbursement
+  scope     String @default("domestic") // domestic | international
+  payeeType String @default("individual") // individual | company
+
+  // Who is being paid (email is the only required contact)
+  payeeName    String
+  contactEmail String
+  contactPhone String?
+  country      String?
+  addressLine  String?
+  city         String?
+  stateRegion  String?
+  postalCode   String?
+
+  // What it is for
+  eventRef String?
+  purpose  String
+  amount   Float
+  currency String @default("INR")
+
+  // Tax / compliance
+  panOrTin            String?
+  gstin               String?
+  taxResidencyCountry String?
+  form10fInfo         String?
+  noPeDeclared        Boolean @default(false)
+
+  // Bank details (domestic + international)
+  beneficiaryName  String?
+  bankName         String?
+  accountNumber    String?
+  ifsc             String?
+  iban             String?
+  swiftBic         String?
+  bankAddress      String?
+  intermediaryBank String?
+
+  // Agreement (click-wrap)
+  agreementAccepted   Boolean   @default(false)
+  agreementAcceptedAt DateTime?
+  signerName          String?
+
+  // Anti-spam / audit
+  submitIp  String?
+  submitIsp String?
+
+  // Workflow
+  status        String    @default("submitted") // submitted | under_review | approved | on_hold | rejected | paid
+  reviewedById  String?
+  reviewedBy    Profile?  @relation("PaymentReviewer", fields: [reviewedById], references: [id])
+  reviewNotes   String?
+  paidAt        DateTime?
+  paymentTxnRef String?
+  receiptNo     String?
+  receiptIssuedAt DateTime?
+  sheetSyncedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  documents PaymentDocument[]
+  events    PaymentStatusEvent[]
+}
+
+model PaymentDocument {
+  id               String         @id @default(cuid())
+  paymentRequestId String
+  request          PaymentRequest @relation(fields: [paymentRequestId], references: [id], onDelete: Cascade)
+  kind             String // invoice | trc | form10f | no_pe | pan | gst | id_proof | bank_proof | agreement | other
+  originalName     String
+  storedName       String
+  mimeType         String
+  sizeBytes        Int
+  createdAt        DateTime       @default(now())
+}
+
+model PaymentStatusEvent {
+  id               String         @id @default(cuid())
+  paymentRequestId String
+  request          PaymentRequest @relation(fields: [paymentRequestId], references: [id], onDelete: Cascade)
+  status           String
+  note             String?
+  changedById      String?
+  changedBy        Profile?       @relation("PaymentStatusActor", fields: [changedById], references: [id])
+  source           String         @default("portal") // portal | sheet | system
+  createdAt        DateTime       @default(now())
+}
