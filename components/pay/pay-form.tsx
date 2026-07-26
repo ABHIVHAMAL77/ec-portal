@@ -151,6 +151,9 @@ export function PayForm() {
     if (i === 1) {
       if (!f.payeeName.trim()) return "Please enter the name money should be paid to.";
       if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(f.contactEmail)) return "Please enter a valid email address.";
+      if (f.contactPhone.replace(/\D/g, "").length < 7) {
+        return "Please enter a valid phone number, including the country code.";
+      }
     }
     if (i === 2) {
       if (!f.purpose.trim()) return "Please describe what this payment is for.";
@@ -344,9 +347,12 @@ export function PayForm() {
               />
               <Field
                 name="contactPhone"
-                labelText="Phone (optional)"
+                labelText="Phone number"
+                required
+                hint="Include the country code, e.g. +91 98765 43210."
                 value={f.contactPhone}
                 onChange={set("contactPhone")}
+                placeholder="+91 98765 43210"
               />
               <Field name="country" labelText="Country" value={f.country} onChange={set("country")} />
               <div className="sm:col-span-2">

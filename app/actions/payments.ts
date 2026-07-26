@@ -89,6 +89,7 @@ export async function submitPayment(formData: FormData): Promise<SubmitResult> {
 
   const payeeName = s("payeeName");
   const contactEmail = s("contactEmail").toLowerCase();
+  const contactPhone = s("contactPhone");
   const purpose = s("purpose");
   const amountRaw = s("amount");
   const category = s("category");
@@ -96,6 +97,9 @@ export async function submitPayment(formData: FormData): Promise<SubmitResult> {
 
   if (!payeeName) return { error: "Please enter the name money should be paid to." };
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(contactEmail)) return { error: "Please enter a valid email address." };
+  if (contactPhone.replace(/\D/g, "").length < 7) {
+    return { error: "Please enter a valid phone number, including the country code." };
+  }
   if (!category) return { error: "Please choose what this payment is for." };
   if (!purpose) return { error: "Please describe what the payment is for." };
 
@@ -151,7 +155,7 @@ export async function submitPayment(formData: FormData): Promise<SubmitResult> {
       payeeType: s("payeeType") || "individual",
       payeeName,
       contactEmail,
-      contactPhone: s("contactPhone") || null,
+      contactPhone,
       country: s("country") || null,
       addressLine: s("addressLine") || null,
       city: s("city") || null,

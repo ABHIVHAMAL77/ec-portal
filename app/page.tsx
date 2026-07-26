@@ -103,6 +103,7 @@ export default function Home() {
           <h3 className="text-sm font-semibold">Before you start, please have ready</h3>
           <ul className="mt-2 grid gap-1.5 text-sm text-[var(--text-muted)] md:grid-cols-2">
             <li>• Your invoice (PDF or image)</li>
+            <li>• Your email address and phone number (with country code)</li>
             <li>• Bank details — IFSC for India, SWIFT/IBAN for international</li>
             <li>• PAN / Tax ID (and GST certificate if registered)</li>
             <li>
