@@ -13,6 +13,15 @@ if ! grep -q '^UPLOAD_DIR=' .env 2>/dev/null; then
   echo "    added UPLOAD_DIR to .env"
 fi
 
+# Nginx defaults to a 1MB request body, which is far too small for document
+# uploads. Add the limit to the site config if it isn't there yet.
+NGINX_SITE=/etc/nginx/sites-available/portal
+if [ -f "$NGINX_SITE" ] && ! grep -q "client_max_body_size" "$NGINX_SITE"; then
+  echo "==> Raising Nginx upload limit to 30m..."
+  sed -i "/server_name/a\\    client_max_body_size 30m;" "$NGINX_SITE"
+  nginx -t && systemctl reload nginx
+fi
+
 echo "==> Installing any new dependencies..."
 npm install
 

@@ -7,6 +7,14 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: path.join(__dirname),
   },
+  experimental: {
+    serverActions: {
+      // Payment submissions post several documents (invoice, TRC, Form 10F,
+      // bank proof...) in one multipart request. The default cap is 1MB,
+      // which real scans blow past immediately.
+      bodySizeLimit: "30mb",
+    },
+  },
 };
 
 export default nextConfig;

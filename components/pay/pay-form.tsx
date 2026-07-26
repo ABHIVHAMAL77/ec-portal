@@ -59,6 +59,13 @@ function Field({
   );
 }
 
+const MAX_FILE_BYTES = 10 * 1024 * 1024; // per file
+const MAX_TOTAL_BYTES = 28 * 1024 * 1024; // all files in one submission
+
+function mb(bytes: number) {
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
 function FileField({
   name,
   labelText,
@@ -82,7 +89,7 @@ function FileField({
       <label className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-dashed border-[var(--border)] bg-[var(--bg-elev)] px-3 py-2.5 text-sm hover:border-[var(--brand)]">
         <Upload size={15} className="shrink-0 text-[var(--text-dim)]" />
         <span className={file ? "truncate text-[var(--text)]" : "text-[var(--text-dim)]"}>
-          {file ? file.name : "Choose a PDF or image (max 10 MB)"}
+          {file ? `${file.name} · ${mb(file.size)}` : "Choose a PDF or image (max 10 MB)"}
         </span>
         <input
           type="file"
@@ -139,7 +146,14 @@ export function PayForm() {
 
   // files
   const [files, setFiles] = useState<Record<string, File | null>>({});
-  const setFile = (k: string) => (file: File | null) => setFiles((p) => ({ ...p, [k]: file }));
+  const setFile = (k: string) => (file: File | null) => {
+    if (file && file.size > MAX_FILE_BYTES) {
+      setError(`"${file.name}" is ${mb(file.size)} — each file must be under 10 MB.`);
+      return;
+    }
+    setError(null);
+    setFiles((p) => ({ ...p, [k]: file }));
+  };
 
   const [noPe, setNoPe] = useState(false);
   const [agreed, setAgreed] = useState(false);
@@ -202,6 +216,16 @@ export function PayForm() {
         return setError(err);
       }
     }
+
+    const attached = Object.values(files).filter(Boolean) as File[];
+    const total = attached.reduce((n, file) => n + file.size, 0);
+    if (total > MAX_TOTAL_BYTES) {
+      return setError(
+        `Your documents add up to ${mb(total)}, which is over the ${mb(MAX_TOTAL_BYTES)} limit. ` +
+          `Please compress them or remove any optional files, then try again.`
+      );
+    }
+
     const fd = new FormData();
     Object.entries(f).forEach(([k, v]) => fd.set(k, v));
     Object.entries(files).forEach(([k, file]) => file && fd.set(k, file));

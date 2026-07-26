@@ -51,6 +51,9 @@ cat > /etc/nginx/sites-available/portal <<'NGINX'
 server {
     listen 80;
     server_name portal.esportscounty.com;
+
+    # Payment submissions upload several documents at once.
+    client_max_body_size 30m;
     location / {
         proxy_pass http://localhost:3000;
         proxy_http_version 1.1;
