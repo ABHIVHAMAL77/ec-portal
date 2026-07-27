@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { LogoMark } from "@/components/logo";
-import { FileText, ShieldCheck, Search, ArrowRight, Landmark } from "lucide-react";
+import { FileText, ShieldCheck, Search, ArrowRight, Landmark, FileSpreadsheet } from "lucide-react";
 
 export const metadata = {
   title: "Esports County — Payments",
@@ -111,6 +111,14 @@ export default function Home() {
               Certificate (TRC)</strong>, Form 10F and a No-PE declaration
             </li>
           </ul>
+          <a
+            href="/esports-county-invoice-template.xlsx"
+            download
+            className="mt-4 inline-flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-4 py-2.5 text-sm font-medium transition-colors hover:border-[var(--brand)]"
+          >
+            <FileSpreadsheet size={16} className="text-[var(--brand)]" />
+            Download our invoice template (Excel)
+          </a>
         </section>
       </main>
 

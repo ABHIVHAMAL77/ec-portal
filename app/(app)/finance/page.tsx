@@ -4,6 +4,7 @@ import { canSeeAll } from "@/lib/access";
 import { weekStart } from "@/lib/utils";
 import { Card, CardHeader, EmptyState, Stat, Badge } from "@/components/ui";
 import { NewManpowerButton, ManpowerRow, type Req } from "@/components/manpower";
+import { LocalTime } from "@/components/local-time";
 
 function hours(a: Date, b: Date | null) {
   return Math.max(0, ((b ?? new Date()).getTime() - a.getTime()) / 3600000);
@@ -89,7 +90,7 @@ export default async function FinancePage() {
               <div key={a.id} className="px-5 py-3">
                 <div className="flex items-center justify-between">
                   <p className="text-sm font-medium">
-                    {a.clockIn.toLocaleDateString("en-GB", { day: "2-digit", month: "short" })}
+                    <LocalTime iso={a.clockIn.toISOString()} mode="date" />
                   </p>
                   <span className="text-xs text-[var(--text-dim)]">{hours(a.clockIn, a.clockOut).toFixed(1)}h</span>
                 </div>

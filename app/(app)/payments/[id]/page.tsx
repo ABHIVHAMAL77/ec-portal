@@ -14,7 +14,8 @@ import {
 } from "@/lib/constants";
 import { Card, CardHeader, Badge, Dot, EmptyState } from "@/components/ui";
 import { PaymentReview } from "@/components/payment-review";
-import { formatDate, timeAgo } from "@/lib/utils";
+import { formatDate } from "@/lib/utils";
+import { LocalTime } from "@/components/local-time";
 import { ArrowLeft, FileText, Download, ShieldAlert, Printer } from "lucide-react";
 
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
@@ -64,7 +65,7 @@ export default async function PaymentDetailPage({ params }: { params: Promise<{ 
             </Badge>
           </div>
           <p className="mt-1 text-sm text-[var(--text-muted)]">
-            {r.payeeName} · {money} · submitted {formatDate(r.createdAt)}
+            {r.payeeName} · {money} · submitted <LocalTime iso={r.createdAt.toISOString()} mode="date" />
           </p>
         </div>
         {r.status === "paid" && (
@@ -170,7 +171,7 @@ export default async function PaymentDetailPage({ params }: { params: Promise<{ 
             <Card>
               <CardHeader title="Payment record" />
               <div className="px-5 py-3">
-                <Row label="Paid on" value={r.paidAt ? formatDate(r.paidAt) : null} />
+                <Row label="Paid on" value={r.paidAt ? <LocalTime iso={r.paidAt.toISOString()} mode="datetime" /> : null} />
                 <Row label="Receipt no." value={r.receiptNo} />
                 <Row label="Bank ref" value={r.paymentTxnRef} />
                 <Row label="Reviewed by" value={r.reviewedBy?.fullName} />
@@ -185,7 +186,7 @@ export default async function PaymentDetailPage({ params }: { params: Promise<{ 
               <Row label="Signed by" value={r.signerName} />
               <Row
                 label="Accepted at"
-                value={r.agreementAcceptedAt ? formatDate(r.agreementAcceptedAt) : null}
+                value={r.agreementAcceptedAt ? <LocalTime iso={r.agreementAcceptedAt.toISOString()} mode="datetime" /> : null}
               />
             </div>
           </Card>
@@ -218,7 +219,7 @@ export default async function PaymentDetailPage({ params }: { params: Promise<{ 
                     <p className="text-sm font-medium">{PAYMENT_STATUS_LABEL[e.status] ?? e.status}</p>
                     {e.note && <p className="text-xs text-[var(--text-muted)]">{e.note}</p>}
                     <p className="text-[11px] text-[var(--text-dim)]">
-                      {timeAgo(e.createdAt)}
+                      <LocalTime iso={e.createdAt.toISOString()} mode="ago" />
                       {e.changedBy ? ` · ${e.changedBy.fullName}` : ""}
                       {e.source !== "portal" ? ` · via ${e.source}` : ""}
                     </p>

@@ -2,12 +2,10 @@ import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { Card, CardHeader, Avatar, Badge, EmptyState, Stat } from "@/components/ui";
 import { ClockToggle } from "@/components/clock-toggle";
+import { LocalTime, LocalTimezone } from "@/components/local-time";
 
 function hoursBetween(a: Date, b: Date) {
   return Math.max(0, (b.getTime() - a.getTime()) / 3600000);
-}
-function fmtTime(d: Date) {
-  return new Date(d).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
 }
 
 export default async function AttendancePage() {
@@ -35,12 +33,15 @@ export default async function AttendancePage() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold">Attendance</h2>
-          <p className="text-sm text-[var(--text-muted)]">Clock in when you start working today.</p>
+          <p className="text-sm text-[var(--text-muted)]">
+            Clock in when you start working today. Times shown in your timezone
+            (<LocalTimezone />).
+          </p>
         </div>
         <div className="flex items-center gap-3">
           {myOpen && (
             <span className="text-sm text-[var(--success)]">
-              ● Clocked in at {fmtTime(myOpen.clockIn)}
+              ● Clocked in at <LocalTime iso={myOpen.clockIn.toISOString()} mode="time" />
             </span>
           )}
           <ClockToggle isIn={!!myOpen} />
@@ -68,7 +69,9 @@ export default async function AttendancePage() {
                   <p className="truncate text-xs text-[var(--text-dim)]">{a.profile.jobRole}</p>
                 </div>
                 <span className="text-xs text-[var(--text-dim)]">
-                  {fmtTime(a.clockIn)} – {a.clockOut ? fmtTime(a.clockOut) : "now"}
+                  <LocalTime iso={a.clockIn.toISOString()} mode="time" />
+                  {" – "}
+                  {a.clockOut ? <LocalTime iso={a.clockOut.toISOString()} mode="time" /> : "now"}
                 </span>
                 <span className="w-14 text-right text-sm font-medium">{hrs.toFixed(1)}h</span>
                 {open ? (

@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Check, ChevronLeft, ChevronRight, Upload, AlertCircle } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Upload, AlertCircle, FileSpreadsheet } from "lucide-react";
 import { submitPayment } from "@/app/actions/payments";
 import {
   PAYMENT_CATEGORIES,
@@ -455,6 +455,14 @@ export function PayForm() {
                   file={files.invoiceFile ?? null}
                   onFile={setFile("invoiceFile")}
                 />
+                <a
+                  href="/esports-county-invoice-template.xlsx"
+                  download
+                  className="mt-2 inline-flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--bg-elev)] px-3 py-2 text-xs text-[var(--text-muted)] transition-colors hover:border-[var(--brand)] hover:text-[var(--text)]"
+                >
+                  <FileSpreadsheet size={14} className="text-[var(--brand)]" />
+                  Don&apos;t have an invoice? Download our template (Excel)
+                </a>
               </div>
             </div>
           </div>
