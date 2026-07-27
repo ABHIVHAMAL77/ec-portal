@@ -234,9 +234,20 @@ export function PayForm() {
 
     start(async () => {
       setError(null);
-      const res = await submitPayment(fd);
-      if (res?.error) setError(res.error);
-      else if (res?.trackingCode) router.push(`/pay/success?code=${encodeURIComponent(res.trackingCode)}`);
+      try {
+        const res = await submitPayment(fd);
+        if (res?.error) setError(res.error);
+        else if (res?.trackingCode) {
+          router.push(`/pay/success?code=${encodeURIComponent(res.trackingCode)}`);
+        }
+      } catch {
+        // Usually a stale page after a deployment (the server action id changed),
+        // or the connection dropped mid-upload. Neither is the payee's fault.
+        setError(
+          "We couldn't submit that — the page may be out of date, or the upload was interrupted. " +
+            "Please refresh this page and try again. Your details will need re-entering, sorry."
+        );
+      }
     });
   }
 
