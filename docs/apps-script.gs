@@ -1,87 +1,89 @@
 /**
- * Esports County — Payments ⇄ Google Sheet sync
+ * Esports County — Google Sheet sync
  * ---------------------------------------------------------------------------
- * HOW TO SET UP (5 minutes, one time)
+ * Two things live here:
  *
- * 1. Create a Google Sheet, e.g. "Esports County — Payments".
- * 2. Extensions → Apps Script. Delete anything there and paste this whole file.
- * 3. Edit the two settings just below (PORTAL_URL and SECRET).
- *      SECRET must match SHEET_SYNC_SECRET in the portal's .env file.
- * 4. Save, then in the toolbar choose the function "pullFromPortal" and click Run.
- *      Google will ask for permission the first time — approve it.
- * 5. Automatic refresh: Triggers (clock icon) → Add Trigger →
- *      function: pullFromPortal · event source: Time-driven · every 5 minutes.
- * 6. Push status edits back: Triggers → Add Trigger →
- *      function: onSheetEdit · event source: From spreadsheet · On edit.
+ *   PAYMENTS  (sheet tab "Payments")
+ *     • rows arrive from the portal automatically
+ *     • change the "status" cell and the portal updates + emails the payee
  *
- * After that: new submissions appear automatically, and when you change a
- * value in the Status column the portal is updated and the payee is emailed.
- * Valid statuses: submitted, under_review, approved, on_hold, rejected, paid
+ *   TASKS     (sheet tab "Tasks")
+ *     • type as many rows as you like, leave "taskId" blank
+ *     • menu: Esports County -> Push tasks to portal
+ *       ...they're created, assigned, and the assignee is notified
+ *     • existing rows (with a taskId) are updated instead
+ *
+ * ---------------------------------------------------------------------------
+ * SETUP (once)
+ *   1. Extensions -> Apps Script, paste this whole file.
+ *   2. Fill in SECRET below (same value as SHEET_SYNC_SECRET on the server).
+ *   3. Run "pullFromPortal" once and approve the permission prompt.
+ *   4. Triggers (clock icon):
+ *        pullFromPortal  · Time-driven · every 5 minutes
+ *        onSheetEdit     · From spreadsheet · On edit
+ *   5. Reload the sheet — an "Esports County" menu appears.
  * ---------------------------------------------------------------------------
  */
 
-// ============ SETTINGS — edit these two lines ============
+// ============ SETTINGS — edit this ============
 const PORTAL_URL = 'https://portal.esportscounty.com';
-const SECRET = 'PASTE_THE_SAME_SECRET_AS_SHEET_SYNC_SECRET';
-// =========================================================
+const SECRET = 'PASTE_YOUR_SECRET_HERE';
+// ==============================================
 
 const SHEET_NAME = 'Payments';
+const TASK_SHEET_NAME = 'Tasks';
 const STATUS_COL_NAME = 'status';
 
-/** Pull every payment request from the portal into the sheet. */
-function pullFromPortal() {
-  const res = UrlFetchApp.fetch(
-    PORTAL_URL + '/api/sheet/export?secret=' + encodeURIComponent(SECRET),
-    { muteHttpExceptions: true }
-  );
+/* ------------------------------------------------------------------ helpers */
 
-  if (res.getResponseCode() !== 200) {
-    throw new Error('Portal error ' + res.getResponseCode() + ': ' + res.getContentText());
-  }
-
-  const data = JSON.parse(res.getContentText());
-  const columns = data.columns;
-  const rows = data.rows || [];
-
+function writeGrid_(sheetName, columns, rows) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(SHEET_NAME) || ss.insertSheet(SHEET_NAME);
+  const sheet = ss.getSheetByName(sheetName) || ss.insertSheet(sheetName);
 
-  // Header
-  sheet.getRange(1, 1, 1, columns.length).setValues([columns]);
-  sheet.getRange(1, 1, 1, columns.length).setFontWeight('bold');
+  sheet.getRange(1, 1, 1, columns.length).setValues([columns]).setFontWeight('bold');
   sheet.setFrozenRows(1);
 
-  // Body
   if (rows.length) {
     const values = rows.map(function (r) {
-      return columns.map(function (c) {
-        return r[c];
-      });
+      return columns.map(function (c) { return r[c]; });
     });
     sheet.getRange(2, 1, values.length, columns.length).setValues(values);
   }
 
-  // Clear any leftover rows from previous pulls
   const lastRow = sheet.getLastRow();
   if (lastRow > rows.length + 1) {
     sheet.getRange(rows.length + 2, 1, lastRow - rows.length - 1, columns.length).clearContent();
   }
-
-  sheet.autoResizeColumns(1, Math.min(columns.length, 8));
-  SpreadsheetApp.getActiveSpreadsheet().toast('Synced ' + rows.length + ' payment requests.');
+  return sheet;
 }
 
-/** When the Status column is edited, push the change back to the portal. */
+function fetchJson_(url, options) {
+  const res = UrlFetchApp.fetch(url, options || { muteHttpExceptions: true });
+  const code = res.getResponseCode();
+  if (code !== 200) {
+    throw new Error('Portal error ' + code + ': ' + res.getContentText());
+  }
+  return JSON.parse(res.getContentText());
+}
+
+/* ----------------------------------------------------------------- payments */
+
+function pullFromPortal() {
+  const data = fetchJson_(PORTAL_URL + '/api/sheet/export?secret=' + encodeURIComponent(SECRET));
+  writeGrid_(SHEET_NAME, data.columns, data.rows || []);
+  SpreadsheetApp.getActiveSpreadsheet().toast('Synced ' + (data.rows || []).length + ' payment requests.');
+}
+
 function onSheetEdit(e) {
   const sheet = e.range.getSheet();
   if (sheet.getName() !== SHEET_NAME) return;
-  if (e.range.getRow() === 1) return; // header
+  if (e.range.getRow() === 1) return;
 
   const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
   const statusCol = headers.indexOf(STATUS_COL_NAME) + 1;
   const codeCol = headers.indexOf('trackingCode') + 1;
   if (statusCol === 0 || codeCol === 0) return;
-  if (e.range.getColumn() !== statusCol) return; // only Status edits
+  if (e.range.getColumn() !== statusCol) return;
 
   const row = e.range.getRow();
   const trackingCode = sheet.getRange(row, codeCol).getValue();
@@ -96,23 +98,124 @@ function onSheetEdit(e) {
       secret: SECRET,
       trackingCode: trackingCode,
       status: status,
-      note: 'Updated from the finance sheet.',
-    }),
+      note: 'Updated from the finance sheet.'
+    })
   });
 
   if (res.getResponseCode() === 200) {
     SpreadsheetApp.getActiveSpreadsheet().toast(trackingCode + ' → ' + status);
   } else {
-    SpreadsheetApp.getUi().alert(
-      'Could not update ' + trackingCode + '\n\n' + res.getContentText()
+    SpreadsheetApp.getUi().alert('Could not update ' + trackingCode + '\n\n' + res.getContentText());
+  }
+}
+
+/* -------------------------------------------------------------------- tasks */
+
+/** Portal -> sheet. Refreshes the Tasks tab (and fills in taskId). */
+function pullTasks() {
+  const data = fetchJson_(PORTAL_URL + '/api/sheet/tasks?secret=' + encodeURIComponent(SECRET));
+  const sheet = writeGrid_(TASK_SHEET_NAME, data.columns, data.rows || []);
+  addTaskDropdowns_(sheet);
+  SpreadsheetApp.getActiveSpreadsheet().toast('Loaded ' + (data.rows || []).length + ' tasks.');
+}
+
+/**
+ * Sheet -> portal. Rows with a blank taskId are created and assigned;
+ * rows with a taskId are updated. taskIds are written back so the next
+ * push updates instead of duplicating.
+ */
+function pushTasks() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(TASK_SHEET_NAME);
+  if (!sheet) {
+    SpreadsheetApp.getUi().alert('No "' + TASK_SHEET_NAME + '" tab yet. Run "Load tasks from portal" first.');
+    return;
+  }
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) {
+    ss.toast('Nothing to push — add some rows first.');
+    return;
+  }
+
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const values = sheet.getRange(2, 1, lastRow - 1, headers.length).getValues();
+
+  const rows = values.map(function (v) {
+    const obj = {};
+    headers.forEach(function (h, i) {
+      let cell = v[i];
+      // Dates must go over as plain YYYY-MM-DD.
+      if (h === 'dueDate' && Object.prototype.toString.call(cell) === '[object Date]') {
+        cell = Utilities.formatDate(cell, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+      }
+      obj[h] = cell === '' || cell === null ? '' : String(cell);
+    });
+    return obj;
+  });
+
+  const res = UrlFetchApp.fetch(PORTAL_URL + '/api/sheet/tasks', {
+    method: 'post',
+    contentType: 'application/json',
+    muteHttpExceptions: true,
+    payload: JSON.stringify({ secret: SECRET, rows: rows })
+  });
+
+  if (res.getResponseCode() !== 200) {
+    SpreadsheetApp.getUi().alert('Push failed\n\n' + res.getContentText());
+    return;
+  }
+
+  const out = JSON.parse(res.getContentText());
+  const idCol = headers.indexOf('taskId') + 1;
+
+  // Write new ids back, and flag anything that was skipped.
+  const problems = [];
+  (out.results || []).forEach(function (r) {
+    if (r.taskId && idCol > 0) sheet.getRange(r.row, idCol).setValue(r.taskId);
+    if (r.error) problems.push('Row ' + r.row + ': ' + r.error);
+  });
+
+  let msg = 'Created ' + out.created + ', updated ' + out.updated + '.';
+  if (problems.length) {
+    SpreadsheetApp.getUi().alert(msg + '\n\nSome rows were skipped:\n\n' + problems.join('\n'));
+  } else {
+    ss.toast(msg);
+  }
+}
+
+/** Dropdowns so priority/status can't be typed wrong. */
+function addTaskDropdowns_(sheet) {
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const rows = Math.max(sheet.getMaxRows() - 1, 1);
+
+  const priorityCol = headers.indexOf('priority') + 1;
+  if (priorityCol > 0) {
+    sheet.getRange(2, priorityCol, rows).setDataValidation(
+      SpreadsheetApp.newDataValidation()
+        .requireValueInList(['low', 'medium', 'high', 'urgent'], true)
+        .setAllowInvalid(false).build()
+    );
+  }
+
+  const statusCol = headers.indexOf('status') + 1;
+  if (statusCol > 0) {
+    sheet.getRange(2, statusCol, rows).setDataValidation(
+      SpreadsheetApp.newDataValidation()
+        .requireValueInList(['todo', 'in_progress', 'review', 'done'], true)
+        .setAllowInvalid(false).build()
     );
   }
 }
 
-/** Adds a "Payments" menu with a manual Sync button. */
+/* --------------------------------------------------------------------- menu */
+
 function onOpen() {
   SpreadsheetApp.getUi()
-    .createMenu('Payments')
-    .addItem('Sync from portal', 'pullFromPortal')
+    .createMenu('Esports County')
+    .addItem('Sync payments from portal', 'pullFromPortal')
+    .addSeparator()
+    .addItem('Load tasks from portal', 'pullTasks')
+    .addItem('Push tasks to portal', 'pushTasks')
     .addToUi();
 }
